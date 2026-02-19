@@ -3,12 +3,12 @@ const path = require("path");
 
 module.exports.config = {
   name: "تكرار",
-  version: "1.0.0",
-  hasPermssion: 0,
+  version: "1.1.0",
+  hasPermssion: 2,
   credits: "الوكيل",
-  description: "تغيير اسم المجموعة تلقائياً كل 45 ثانية",
-  commandCategory: "الخدمات",
-  usages: "[تشغيل/إيقاف]",
+  description: "تغيير اسم المجموعة تلقائياً كل 45 ثانية بالاسم المحدد",
+  commandCategory: "المطور",
+  usages: "[تشغيل اسم_المجموعة / إيقاف]",
   cooldowns: 5
 };
 
@@ -17,20 +17,30 @@ module.exports.onLoad = function () {
 }
 
 module.exports.run = async function({ event, api, args }) {
-  const { threadID, messageID } = event;
+  const { threadID, messageID, senderID } = event;
   const pathData = path.join(__dirname, "cache", "repeat_status.json");
   
+  // Extra safety check for developers (usually handled by hasPermssion: 2)
+  const config = require(path.join(global.client.mainPath, "config.json"));
+  if (!config.ADMINBOT.includes(senderID)) return api.sendMessage("عذراً، هذا الأمر مخصص للمطورين فقط ❌", threadID, messageID);
+
   if (!fs.existsSync(pathData)) fs.writeJsonSync(pathData, {});
   let data = fs.readJsonSync(pathData);
 
   if (args[0] == "تشغيل" || args[0] == "on") {
-    if (data[threadID] === "on") return api.sendMessage("التكرار مفعل بالفعل في هذه المجموعة ✅", threadID, messageID);
+    let targetName = args.slice(1).join(" ");
+    if (!targetName) return api.sendMessage("يرجى تحديد الاسم الذي تريد تكراره ⚠️\nمثال: .تكرار تشغيل اسم المجموعة", threadID, messageID);
+
+    if (data[threadID] === "on") {
+      // If already running, update the name but don't start a new interval
+      data[threadID + "_name"] = targetName;
+      fs.writeJsonSync(pathData, data);
+      return api.sendMessage(`تم تحديث الاسم المكرر إلى: ${targetName} ✅`, threadID, messageID);
+    }
     
     data[threadID] = "on";
+    data[threadID + "_name"] = targetName;
     fs.writeJsonSync(pathData, data);
-    
-    const names = ["𒀷 ▸ 🎴𝐃⃢⃟𝐂🐦‍⬛ ◂ 𒁈", "𝑻𝒉𝒆 𝑪𝒓𝒐𝒘 𝑯𝒂𝒅𝒆𝒔", "𝗔𝗨𝗧𝗢 𝗥𝗘𝗣𝗟𝗬", "𝐃⃢⃟𝐂 🐦‍⬛"];
-    let i = 0;
     
     const interval = setInterval(async () => {
       try {
@@ -39,8 +49,8 @@ module.exports.run = async function({ event, api, args }) {
           clearInterval(interval);
           return;
         }
-        await api.setTitle(names[i % names.length], threadID);
-        i++;
+        let nameToSet = currentData[threadID + "_name"] || "Default Name";
+        await api.setTitle(nameToSet, threadID);
       } catch (e) {
         console.log(e);
         clearInterval(interval);
@@ -50,7 +60,7 @@ module.exports.run = async function({ event, api, args }) {
     if (!global.repeat_intervals) global.repeat_intervals = new Map();
     global.repeat_intervals.set(threadID, interval);
     
-    return api.sendMessage("تم تشغيل تكرار تغيير اسم المجموعة كل 45 ثانية ✅", threadID, messageID);
+    return api.sendMessage(`تم تشغيل تكرار تغيير اسم المجموعة إلى "${targetName}" كل 45 ثانية ✅`, threadID, messageID);
     
   } else if (args[0] == "إيقاف" || args[0] == "ايقاف" || args[0] == "off") {
     data[threadID] = "off";
@@ -63,6 +73,6 @@ module.exports.run = async function({ event, api, args }) {
     
     return api.sendMessage("تم إيقاف تكرار تغيير اسم المجموعة ❌", threadID, messageID);
   } else {
-    return api.sendMessage("يرجى استخدام: تكرار [تشغيل/إيقاف]", threadID, messageID);
+    return api.sendMessage("يرجى استخدام: تكرار تشغيل [الاسم] أو تكرار إيقاف", threadID, messageID);
   }
 };
