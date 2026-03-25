@@ -3,7 +3,7 @@ const path = require("path");
 
 module.exports.config = {
   name: "تكرار",
-  version: "1.1.0",
+  version: "1.2.0",
   hasPermssion: 2,
   credits: "الوكيل",
   description: "تغيير اسم المجموعة تلقائياً كل 45 ثانية بالاسم المحدد",
@@ -12,17 +12,23 @@ module.exports.config = {
   cooldowns: 5
 };
 
-module.exports.onLoad = function () {
-    if (!global.repeat_intervals) global.repeat_intervals = new Map();
+function isSuperDev(senderID) {
+  try {
+    const configPath = path.join(global.client.mainPath, "config.json");
+    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    return (config.SUPERADMIN || []).includes(senderID) || (config.ADMINBOT || []).includes(senderID);
+  } catch(e) { return false; }
 }
+
+module.exports.onLoad = function () {
+  if (!global.repeat_intervals) global.repeat_intervals = new Map();
+};
 
 module.exports.run = async function({ event, api, args }) {
   const { threadID, messageID, senderID } = event;
   const pathData = path.join(__dirname, "cache", "repeat_status.json");
-  
-  // Extra safety check for developers (usually handled by hasPermssion: 2)
-  const config = require(path.join(global.client.mainPath, "config.json"));
-  if (!config.ADMINBOT.includes(senderID)) return api.sendMessage("عذراً، هذا الأمر مخصص للمطورين فقط ❌", threadID, messageID);
+
+  if (!isSuperDev(senderID)) return api.sendMessage("عذراً، هذا الأمر مخصص للمطورين فقط ❌", threadID, messageID);
 
   if (!fs.existsSync(pathData)) fs.writeJsonSync(pathData, {});
   let data = fs.readJsonSync(pathData);
